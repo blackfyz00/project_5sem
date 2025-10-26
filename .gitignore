@@ -2,3 +2,7 @@
 /scrins
 /__pycache__
 /venv
+src/__pycache__
+item_features.csv
+interaction_data.csv
+edadata.csv
