@@ -102,13 +102,26 @@ class music_eda:
         self.data = df_encoded
         return self.data
     
-    def encode_track_id(self, column_name='track_id'):
+    def encode_track_id(self, input_column='track_id', output_column='item_id'):
         """
-        Заменяет track_id на числовой индекс строки (0, 1, 2, ...).
-        Полезно для упрощения и экономии памяти.
+        Заменяет значения в колонке `input_column` (по умолчанию 'track_id')
+        на числовой индекс строки (0, 1, 2, ...) и переименовывает колонку
+        в `output_column` (по умолчанию 'item_id').
+
+        Полезно для упрощения, экономии памяти и совместимости с рекомендательными системами.
         """
         df_encoded = self.data.copy()
-        df_encoded[column_name] = df_encoded.index  # или range(len(df_encoded))
+        
+        # Проверка, что исходная колонка существует
+        if input_column not in df_encoded.columns:
+            raise ValueError(f"Колонка '{input_column}' отсутствует в данных.")
+        
+        # Замена значений на индексы строк (или последовательность)
+        df_encoded[output_column] = df_encoded.index  # или: np.arange(len(df_encoded))
+        
+        # Удаление старой колонки, если имя изменилось
+        if input_column != output_column:
+            df_encoded = df_encoded.drop(columns=[input_column])
         self.data = df_encoded
         return self.data
     
@@ -124,3 +137,5 @@ class music_eda:
         
         self.data = df_encoded
         return self.data
+    
+    
