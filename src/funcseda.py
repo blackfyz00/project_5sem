@@ -11,10 +11,12 @@ class music_eda:
         """Заменяет буквенные обозначения тональностей в столбце на числовые (0–11)."""
         df_encoded = self.data.copy()
         df_encoded[column_name] = df_encoded[column_name].map(key_mapping)
-        
-        # Опционально: проверка на неизвестные значения
+        # Проверка на неизвестные значения
         if df_encoded[column_name].isna().any():
-            unknown_keys = df[df_encoded[column_name].isna()][column_name].unique()
+            # Берём маску пропущенных значений после map
+            mask = df_encoded[column_name].isna()
+            # Извлекаем оригинальные (некодируемые) значения из исходного DataFrame
+            unknown_keys = self.data.loc[mask, column_name].dropna().unique()
             raise ValueError(f"Обнаружены неизвестные значения тональности: {unknown_keys}. "
                             f"Поддерживаемые: {list(key_mapping.keys())}")
         self.data = df_encoded
