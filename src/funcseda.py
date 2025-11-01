@@ -1,4 +1,4 @@
-from src.key_mapping import key_mapping
+from course_project.src.mapping import key_mapping, supported_genres
 import pandas as pd
 
 class music_eda:
@@ -47,31 +47,27 @@ class music_eda:
     def encode_genre_column(self, column_name='genre'):
         """
         Заменяет названия музыкальных жанров в столбце на числовые метки (0, 1, 2, ...).
-        Поддерживаемые жанры:
-            ['Movie', 'R&B', 'A Capella', 'Alternative', 'Country', 'Dance',
-            'Electronic', 'Anime', 'Folk', 'Blues', 'Opera', 'Hip-Hop',
-            "Children's Music", 'Rap', 'Indie',
-            'Classical', 'Pop', 'Reggae', 'Reggaeton', 'Jazz', 'Rock', 'Ska',
-            'Comedy', 'Soul', 'Soundtrack', 'World']
+        Поддерживаемые жанры фиксированы и заданы вручную для обеспечения воспроизводимости.
         """
-        # Нормализуем разные варианты написания "Children's Music"
-        df_normalized = self.data.copy()
-        
-        # Уникальные жанры (после нормализации)
-        unique_genres = sorted(df_normalized[column_name].dropna().unique())
-        
-        # Создаём mapping жанр → индекс
-        genre_mapping = {genre: idx for idx, genre in enumerate(unique_genres)}
-        
-        # Применяем mapping
-        df_normalized[column_name] = df_normalized[column_name].map(genre_mapping)
-        
-        # Проверка на неизвестные/пропущенные значения
-        if df_normalized[column_name].isna().any():
-            unknown = df_normalized.loc[df_normalized[column_name].isna(), column_name].unique()
-            raise ValueError(f"Обнаружены неизвестные или пропущенные жанры: {unknown}")
-        
-        self.data = df_normalized
+        # Создаём прямой и обратный маппинги
+        genre_to_idx = {genre: idx for idx, genre in enumerate(supported_genres)}
+        idx_to_genre = {idx: genre for genre, idx in genre_to_idx.items()}
+
+        # Сохраняем маппинги как атрибуты экземпляра (для будущего декодирования)
+        self.genre_to_idx = genre_to_idx
+        self.idx_to_genre = idx_to_genre
+
+        df_encoded = self.data.copy()
+
+        # Заменяем жанры на индексы
+        df_encoded[column_name] = df_encoded[column_name].map(genre_to_idx)
+
+        # Проверка на неизвестные или пропущенные значения
+        if df_encoded[column_name].isna().any():
+            unknown_values = self.data.loc[df_encoded[column_name].isna(), column_name].unique()
+            raise ValueError(f"Обнаружены неизвестные или не поддерживаемые жанры: {unknown_values}")
+
+        self.data = df_encoded
         return self.data
     
     def encode_time_signature(self, column_name='time_signature'):
