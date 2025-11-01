@@ -1,4 +1,4 @@
-from course_project.src.mapping import key_mapping, supported_genres
+from src.this_mapping import key_mapping, supported_genres
 import pandas as pd
 
 class music_eda:
