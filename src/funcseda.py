@@ -134,4 +134,28 @@ class music_eda:
         self.data = df_encoded
         return self.data
     
+    def remove_genres(self, genres=['Anime', 'World', 'Comedy', 'Dance', 'Soundtrack', 'Reggaeton', 
+                                    "Children's Music"]):
+        # Удаляем строки, где genre_name находится в списке genres
+        mask = ~self.data[f'genre'].isin(genres)
+        self.data = self.data[mask].copy()
+        return self.data
+    
+    def filter_by_popularity(self, min_popularity=61):  
+        mask = self.data['popularity'] > min_popularity
+        self.data = self.data[mask].copy()
+        return self.data
+        
+    def do_encoding(self):
+        """Выполняет все методы"""
+        self.encode_key_column()
+        self.encode_tempo()
+        self.encode_time_signature()
+        self.remove_genres()
+        self.filter_by_popularity()
+        self.encode_genre_column()
+        self.encode_track_id()
+        return self.data
+
+    
     
