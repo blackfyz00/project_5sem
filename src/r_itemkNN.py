@@ -47,25 +47,29 @@ class ItemKNN:
         if k == 0:
             return np.zeros((self.n_users, self.n_items))
 
-        neighbour_ids = np.argsort(-self.similarity_matrix, axis=1)[:, :k]
+        # Топ-k соседей, исключая самого себя
+        neighbour_ids = np.argsort(-self.similarity_matrix, axis=1)[:, 1:k+1]
 
         predicted = np.zeros((self.n_users, self.n_items))
 
         for item in range(self.n_items):
             neighbours = neighbour_ids[item]
             sims = self.similarity_matrix[item, neighbours]
-            sims = np.clip(sims, 0, None)  # только положительная схожесть
 
-            if sims.sum() == 0:
+            # Только положительная схожесть
+            mask = sims > 0
+            if not np.any(mask):
                 continue
+            sims = sims[mask]
+            neighbours = neighbours[mask]
 
-            ratings = self.raw_train_matrix[:, neighbours]  # исходные рейтинги
+            ratings = self.raw_train_matrix[:, neighbours]
             weighted_sum = ratings @ sims
             predicted[:, item] = weighted_sum / sims.sum()
 
         if self.filter_seen:
             seen_mask = self.raw_train_matrix > 0
-            predicted[seen_mask] = -np.inf  # чтобы не попали в топ-k
+            predicted[seen_mask] = -np.inf
 
         return predicted
 
@@ -73,14 +77,12 @@ class ItemKNN:
         full_pred = self._predict_full()
 
         if users is None:
+            # Все пользователи из train
             user_indices = np.arange(self.n_users)
             user_ids_original = self.user_enc.inverse_transform(user_indices.reshape(-1, 1)).flatten()
         else:
             users = np.array(users).reshape(-1, 1)
-            try:
-                user_indices = self.user_enc.transform(users).flatten().astype(int)
-            except ValueError as e:
-                raise ValueError(f"Некоторые user_id отсутствуют в train: {e}")
+            user_indices = self.user_enc.transform(users).astype(int).flatten()
             user_ids_original = users.flatten()
 
         pred_subset = full_pred[user_indices]
@@ -92,13 +94,11 @@ class ItemKNN:
         topk_indices = np.take_along_axis(topk_indices, sort_idx, axis=1)
         topk_scores = np.take_along_axis(topk_scores, sort_idx, axis=1)
 
-        # Обратное преобразование item_id
-        item_ids_original = self.item_enc.inverse_transform(topk_indices.reshape(-1, 1)).flatten()
-        scores = topk_scores.flatten()
-        repeated_users = np.repeat(user_ids_original, k)
+        # Обратно в оригинальные item_id
+        item_ids_original = self.item_enc.inverse_transform(topk_indices)
 
         return pd.DataFrame({
-            'user_id': repeated_users,
-            'item_id': item_ids_original,
-            'rating': scores
+            'user_id': np.repeat(user_ids_original, k),
+            'item_id': item_ids_original.flatten(),
+            'rating': topk_scores.flatten()
         })
