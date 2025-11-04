@@ -20,6 +20,10 @@ class ItemKNN:
         self.user_enc = OrdinalEncoder(dtype=int)
         self.item_enc = OrdinalEncoder(dtype=int)
 
+        # В fit():
+        train_log = train_log[train_log['rating'] >= 3].copy()
+        train_log['rating'] = 1.0  # implicit
+
         user_ids = self.user_enc.fit_transform(train_log[['user_id']]).flatten()
         item_ids = self.item_enc.fit_transform(train_log[['item_id']]).flatten()
 
@@ -95,7 +99,7 @@ class ItemKNN:
         topk_scores = np.take_along_axis(topk_scores, sort_idx, axis=1)
 
         # Обратно в оригинальные item_id
-        item_ids_original = self.item_enc.inverse_transform(topk_indices)
+        item_ids_original = self.item_enc.inverse_transform(topk_indices.reshape(-1, 1)).flatten()
 
         return pd.DataFrame({
             'user_id': np.repeat(user_ids_original, k),
