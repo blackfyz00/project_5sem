@@ -1,5 +1,6 @@
-from src.key_mapping import key_mapping
+from src.this_mapping import key_mapping, supported_genres
 import pandas as pd
+import numpy as np
 
 class music_eda:
     def __init__(self, data: pd.DataFrame):
@@ -47,31 +48,27 @@ class music_eda:
     def encode_genre_column(self, column_name='genre'):
         """
         Заменяет названия музыкальных жанров в столбце на числовые метки (0, 1, 2, ...).
-        Поддерживаемые жанры:
-            ['Movie', 'R&B', 'A Capella', 'Alternative', 'Country', 'Dance',
-            'Electronic', 'Anime', 'Folk', 'Blues', 'Opera', 'Hip-Hop',
-            "Children's Music", 'Rap', 'Indie',
-            'Classical', 'Pop', 'Reggae', 'Reggaeton', 'Jazz', 'Rock', 'Ska',
-            'Comedy', 'Soul', 'Soundtrack', 'World']
+        Поддерживаемые жанры фиксированы и заданы вручную для обеспечения воспроизводимости.
         """
-        # Нормализуем разные варианты написания "Children's Music"
-        df_normalized = self.data.copy()
-        
-        # Уникальные жанры (после нормализации)
-        unique_genres = sorted(df_normalized[column_name].dropna().unique())
-        
-        # Создаём mapping жанр → индекс
-        genre_mapping = {genre: idx for idx, genre in enumerate(unique_genres)}
-        
-        # Применяем mapping
-        df_normalized[column_name] = df_normalized[column_name].map(genre_mapping)
-        
-        # Проверка на неизвестные/пропущенные значения
-        if df_normalized[column_name].isna().any():
-            unknown = df_normalized.loc[df_normalized[column_name].isna(), column_name].unique()
-            raise ValueError(f"Обнаружены неизвестные или пропущенные жанры: {unknown}")
-        
-        self.data = df_normalized
+        # Создаём прямой и обратный маппинги
+        genre_to_idx = {genre: idx for idx, genre in enumerate(supported_genres)}
+        idx_to_genre = {idx: genre for genre, idx in genre_to_idx.items()}
+
+        # Сохраняем маппинги как атрибуты экземпляра (для будущего декодирования)
+        self.genre_to_idx = genre_to_idx
+        self.idx_to_genre = idx_to_genre
+
+        df_encoded = self.data.copy()
+
+        # Заменяем жанры на индексы
+        df_encoded[column_name] = df_encoded[column_name].map(genre_to_idx)
+
+        # Проверка на неизвестные или пропущенные значения
+        if df_encoded[column_name].isna().any():
+            unknown_values = self.data.loc[df_encoded[column_name].isna(), column_name].unique()
+            raise ValueError(f"Обнаружены неизвестные или не поддерживаемые жанры: {unknown_values}")
+
+        self.data = df_encoded
         return self.data
     
     def encode_time_signature(self, column_name='time_signature'):
@@ -101,27 +98,27 @@ class music_eda:
         
         self.data = df_encoded
         return self.data
-    
+
+
     def encode_track_id(self, input_column='track_id', output_column='item_id'):
         """
         Заменяет значения в колонке `input_column` (по умолчанию 'track_id')
-        на числовой индекс строки (0, 1, 2, ...) и переименовывает колонку
+        на последовательные целочисленные ID (0, 1, 2, ...) и переименовывает колонку
         в `output_column` (по умолчанию 'item_id').
 
         Полезно для упрощения, экономии памяти и совместимости с рекомендательными системами.
         """
         df_encoded = self.data.copy()
         
-        # Проверка, что исходная колонка существует
         if input_column not in df_encoded.columns:
             raise ValueError(f"Колонка '{input_column}' отсутствует в данных.")
         
-        # Замена значений на индексы строк (или последовательность)
-        df_encoded[output_column] = df_encoded.index  # или: np.arange(len(df_encoded))
+        # Генерируем последовательные ID, независимо от текущего индекса
+        df_encoded[output_column] = np.arange(len(df_encoded))
         
-        # Удаление старой колонки, если имя изменилось
         if input_column != output_column:
             df_encoded = df_encoded.drop(columns=[input_column])
+        
         self.data = df_encoded
         return self.data
     
@@ -137,5 +134,28 @@ class music_eda:
         
         self.data = df_encoded
         return self.data
+    
+    def remove_genres(self, genres=['Anime', 'World', 'Comedy', 'Dance', 'Soundtrack', 'Reggaeton', 
+                                    "Children's Music"]):
+        # Удаляем строки, где genre_name находится в списке genres
+        mask = ~self.data[f'genre'].isin(genres)
+        self.data = self.data[mask].copy()
+        return self.data
+    
+    def filter_by_popularity(self, min_popularity=61):  
+        mask = self.data['popularity'] > min_popularity
+        self.data = self.data[mask].copy()
+        return self.data
+        
+    def do_encoding(self):
+        """Выполняет все методы"""
+        self.encode_key_column()
+        self.encode_tempo()
+        self.encode_time_signature()
+        self.remove_genres()
+        self.filter_by_popularity()
+        self.encode_genre_column()
+        return self.data
+
     
     
