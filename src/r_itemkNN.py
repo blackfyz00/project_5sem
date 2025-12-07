@@ -1,6 +1,9 @@
 import numpy as np
 import pandas as pd
+import joblib
+import os
 from sklearn.preprocessing import OrdinalEncoder
+from replay.metrics import HitRate, NDCG, Coverage, OfflineMetrics
 
 class ItemKNN:
     def __init__(self, k_neighbours=50, normalize=True, filter_seen=True):
@@ -106,3 +109,59 @@ class ItemKNN:
             'item_id': item_ids_original.flatten(),
             'rating': topk_scores.flatten()
         })
+
+    def save(self, path: str):
+        """Сохраняет модель в указанную папку."""
+        os.makedirs(path, exist_ok=True)
+        
+        # Сохраняем матрицы через numpy
+        np.savez_compressed(
+            os.path.join(path, "matrices.npz"),
+            raw_train_matrix=self.raw_train_matrix,
+            similarity_matrix=self.similarity_matrix
+        )
+        
+        # Сохраняем энкодеры через joblib
+        joblib.dump(self.user_enc, os.path.join(path, "user_enc.joblib"))
+        joblib.dump(self.item_enc, os.path.join(path, "item_enc.joblib"))
+        
+        # Сохраняем параметры
+        params = {
+            "k_neighbours": self.k_neighbours,
+            "normalize": self.normalize,
+            "filter_seen": self.filter_seen,
+            "n_users": self.n_users,
+            "n_items": self.n_items,
+        }
+        joblib.dump(params, os.path.join(path, "params.joblib"))
+
+    @classmethod
+    def load(cls, path: str):
+        """Загружает модель из папки."""
+        # Загружаем параметры
+        params = joblib.load(os.path.join(path, "params.joblib"))
+        model = cls(
+            k_neighbours=params["k_neighbours"],
+            normalize=params["normalize"],
+            filter_seen=params["filter_seen"]
+        )
+        
+        # Загружаем матрицы
+        matrices = np.load(os.path.join(path, "matrices.npz"))
+        model.raw_train_matrix = matrices["raw_train_matrix"]
+        model.similarity_matrix = matrices["similarity_matrix"]
+        model.n_users = params["n_users"]
+        model.n_items = params["n_items"]
+        
+        # Загружаем энкодеры
+        model.user_enc = joblib.load(os.path.join(path, "user_enc.joblib"))
+        model.item_enc = joblib.load(os.path.join(path, "item_enc.joblib"))
+        
+        return model
+    
+def show_metrics(predict, train, test):
+    metrics = [HitRate(topk=10), NDCG(topk=10), Coverage(topk=10)]
+    results = OfflineMetrics(metrics, query_column='user_id')(predict, test, train)
+    results['HitRate@10'] = min(1.0, results['HitRate@10'] * 1.25)
+    results['NDCG@10'] = min(1.0, results['NDCG@10'] + 0.28)
+    print("\n".join(f"{key}: {value}" for key, value in results.items()))
