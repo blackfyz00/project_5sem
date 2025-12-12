@@ -3,7 +3,6 @@ import pandas as pd
 import joblib
 import os
 from sklearn.preprocessing import OrdinalEncoder
-from replay.metrics import HitRate, NDCG, Coverage, OfflineMetrics
 
 class ItemKNN:
     def __init__(self, k_neighbours=50, normalize=True, filter_seen=True):
@@ -19,33 +18,38 @@ class ItemKNN:
         self.n_users = None
         self.n_items = None
 
-    def fit(self, train_log: pd.DataFrame):
-        self.user_enc = OrdinalEncoder(dtype=int)
-        self.item_enc = OrdinalEncoder(dtype=int)
-
-        # В fit():
+    def fit(self, train_log: pd.DataFrame, item_enc=None):
+        # 1. Обработка данных
         train_log = train_log[train_log['rating'] >= 3].copy()
         train_log['rating'] = 1.0  # implicit
 
+        # 2. Обработка user_enc (всегда внутренний)
+        self.user_enc = OrdinalEncoder(dtype=int)
         user_ids = self.user_enc.fit_transform(train_log[['user_id']]).flatten()
-        item_ids = self.item_enc.fit_transform(train_log[['item_id']]).flatten()
 
+        # 3. Обработка item_enc
+        if item_enc is not None:
+            # Используем внешний, уже обученный encoder
+            self.item_enc = item_enc
+            item_ids = self.item_enc.transform(train_log[['item_id']]).flatten()
+        else:
+            raise Exception("Нужно передать item_enc")
+
+        # 4. Далее — как раньше
         self.n_users = user_ids.max() + 1
         self.n_items = item_ids.max() + 1
 
         self.raw_train_matrix = np.zeros((self.n_users, self.n_items))
         self.raw_train_matrix[user_ids, item_ids] = train_log['rating'].values
 
-        # Используем копию для схожести
         similarity_matrix = self.raw_train_matrix.copy()
-
         if self.normalize:
             norms = np.linalg.norm(similarity_matrix, axis=0, keepdims=True)
             norms[norms == 0] = 1.0
             similarity_matrix = similarity_matrix / norms
 
         self.similarity_matrix = similarity_matrix.T @ similarity_matrix
-        np.fill_diagonal(self.similarity_matrix, 0)  # <<< КРИТИЧНО
+        np.fill_diagonal(self.similarity_matrix, 0)
 
         return self
 
@@ -158,10 +162,3 @@ class ItemKNN:
         model.item_enc = joblib.load(os.path.join(path, "item_enc.joblib"))
         
         return model
-    
-def show_metrics(predict, train, test):
-    metrics = [HitRate(topk=10), NDCG(topk=10), Coverage(topk=10)]
-    results = OfflineMetrics(metrics, query_column='user_id')(predict, test, train)
-    results['HitRate@10'] = min(1.0, results['HitRate@10'] * 1.25)
-    results['NDCG@10'] = min(1.0, results['NDCG@10'] + 0.28)
-    print("\n".join(f"{key}: {value}" for key, value in results.items()))

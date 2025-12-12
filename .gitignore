@@ -8,3 +8,6 @@ interaction_data.csv
 edadata.csv
 newdata.csv
 requirements.txt
+src/show_metrics.py
+myrep.md
+/streamlit/screenshots

@@ -133,6 +133,3 @@ class music_eda:
         self.filter_by_popularity()
         self.encode_genre_column()
         return self.data
-
-    
-    
