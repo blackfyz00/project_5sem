@@ -98,29 +98,6 @@ class music_eda:
         
         self.data = df_encoded
         return self.data
-
-
-    def encode_track_id(self, input_column='track_id', output_column='item_id'):
-        """
-        Заменяет значения в колонке `input_column` (по умолчанию 'track_id')
-        на последовательные целочисленные ID (0, 1, 2, ...) и переименовывает колонку
-        в `output_column` (по умолчанию 'item_id').
-
-        Полезно для упрощения, экономии памяти и совместимости с рекомендательными системами.
-        """
-        df_encoded = self.data.copy()
-        
-        if input_column not in df_encoded.columns:
-            raise ValueError(f"Колонка '{input_column}' отсутствует в данных.")
-        
-        # Генерируем последовательные ID, независимо от текущего индекса
-        df_encoded[output_column] = np.arange(len(df_encoded))
-        
-        if input_column != output_column:
-            df_encoded = df_encoded.drop(columns=[input_column])
-        
-        self.data = df_encoded
-        return self.data
     
     def encode_tempo(self, column_name='tempo'):
         """
@@ -156,6 +133,3 @@ class music_eda:
         self.filter_by_popularity()
         self.encode_genre_column()
         return self.data
-
-    
-    
