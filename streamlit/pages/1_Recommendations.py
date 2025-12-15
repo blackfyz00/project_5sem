@@ -31,23 +31,27 @@ knn_model, slim_model = load_models()
 # --- Загрузка данных и модели (кэшировано) ---
 @st.cache_resource
 def load_resources():
-    
-    # Загружаем метаданные
     edadata = pd.read_csv(EDA_DATA_PATH)
     data = pd.read_csv(DATA_PATH)
-    
-    # Создаём отображение: (artist, track) → item_id
-    track_choices = edadata[['item_id', 'artist_name', 'track_name']].drop_duplicates().copy()
-    track_choices['display'] = track_choices['artist_name'] + " – " + track_choices['track_name']
-    track_choices = track_choices.set_index('item_id')
-    
-    return edadata, data, track_choices
+
+    # Белый список item_id — только те, что остались после вашей фильтрации
+    allowed_item_ids = set(edadata['item_id'].unique())
+
+    # Для UI: создаём уникальный список треков из белого списка
+    # (по-прежнему убираем дубли по artist+track)
+    ui_tracks = edadata[['item_id', 'artist_name', 'track_name']].drop_duplicates(
+        subset=['artist_name', 'track_name'], keep='first'
+    ).copy()
+    ui_tracks['display'] = ui_tracks['artist_name'] + " – " + ui_tracks['track_name']
+    ui_tracks = ui_tracks.set_index('item_id')
+
+    return allowed_item_ids, ui_tracks, data
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="🎯 Рекомендации по трекам", page_icon="🎯")
 st.title("🎯 Получить рекомендации на основе любимых треков")
 
-edadata, data, track_choices = load_resources()
+allowed_item_ids, track_choices, data = load_resources()
 
 # Выбор треков
 selected_display = st.multiselect(
@@ -105,12 +109,22 @@ if st.button("Получить рекомендации"):
             # Декодируем в оригинальные item_id (через KNN — они должны совпадать)
             top_item_ids = knn_model.item_enc.inverse_transform(top_indices.reshape(-1, 1)).flatten()
 
-            # Получаем метаданные
-            recommendations = data[data['item_id'].isin(top_item_ids)].copy()
-            recommendations['sort_key'] = recommendations['item_id'].map({id_: i for i, id_ in enumerate(top_item_ids)})
-            recommendations = recommendations.sort_values('sort_key').drop('sort_key', axis=1).reset_index(drop=True)
+            # После получения top_item_ids (из модели)
+            # Фильтруем: оставляем ТОЛЬКО те, что есть в белом списке (edadata)
+            allowed_top_item_ids = [item_id for item_id in top_item_ids if item_id in allowed_item_ids]
 
-            st.subheader("Ваши рекомендации (ансамбль ItemKNN + SLIM):")
-            st.dataframe(recommendations, use_container_width=True)
+            if not allowed_top_item_ids:
+                st.warning("Ни одна рекомендация не прошла фильтрацию.")
+            else:
+                # Теперь берём метаданные ИЗ DATA, но только для разрешённых item_id
+                recommendations = data[data['item_id'].isin(allowed_top_item_ids)].copy()
+
+                # Восстанавливаем порядок (top-k порядок из модели)
+                item_id_to_rank = {item_id: i for i, item_id in enumerate(top_item_ids)}
+                recommendations['rank'] = recommendations['item_id'].map(item_id_to_rank)
+                recommendations = recommendations.sort_values('rank').drop('rank', axis=1).reset_index(drop=True)
+
+                st.subheader("Ваши рекомендации:")
+                st.dataframe(recommendations, use_container_width=True)
 
 st.sidebar.caption("© 2025 Music Recommender")
