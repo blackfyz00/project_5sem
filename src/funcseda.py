@@ -124,12 +124,32 @@ class music_eda:
         self.data = self.data[mask].copy()
         return self.data
         
-    def do_encoding(self):
+    def get_unique_tracks(self, track_col='track_id'):
+        """
+        Возвращает копию датафрейма self.data, содержащую только уникальные значения track_id.
+        Дубликаты удаляются, сохраняется первое вхождение.
+        
+        Параметры:
+        - track_col (str): название колонки с идентификаторами треков (по умолчанию 'track_id').
+        
+        Возвращает:
+        - pd.DataFrame: датафрейм с уникальными track_id.
+        """
+        return self.data.drop_duplicates(subset=[track_col]).copy()
+
+    def do_encodingfull(self):
         """Выполняет все методы"""
-        self.encode_key_column()
-        self.encode_tempo()
-        self.encode_time_signature()
-        self.remove_genres()
-        self.filter_by_popularity()
-        self.encode_genre_column()
+        self.data = self.get_unique_tracks()
+        self.data = self.encode_key_column()
+        self.data = self.encode_tempo()
+        self.data = self.encode_time_signature()
+        self.data = self.remove_genres()
+        self.data = self.filter_by_popularity()
+        self.data = self.encode_genre_column()
+        return self.data
+    
+    def do_encodingsoft(self):
+        """Выполняет все методы"""
+        self.data = self.get_unique_tracks()
+        self.data = self.remove_genres()
         return self.data

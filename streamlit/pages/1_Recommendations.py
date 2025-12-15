@@ -34,24 +34,23 @@ def load_resources():
     edadata = pd.read_csv(EDA_DATA_PATH)
     data = pd.read_csv(DATA_PATH)
 
-    # Белый список item_id — только те, что остались после вашей фильтрации
+    # Белый список item_id — только те, что остались после фильтрации в edadata
     allowed_item_ids = set(edadata['item_id'].unique())
 
-    # Для UI: создаём уникальный список треков из белого списка
-    # (по-прежнему убираем дубли по artist+track)
-    ui_tracks = edadata[['item_id', 'artist_name', 'track_name']].drop_duplicates(
-        subset=['artist_name', 'track_name'], keep='first'
-    ).copy()
-    ui_tracks['display'] = ui_tracks['artist_name'] + " – " + ui_tracks['track_name']
-    ui_tracks = ui_tracks.set_index('item_id')
+    track_catalog = data.drop_duplicates(subset=['item_id'], keep='first').set_index('item_id')
 
-    return allowed_item_ids, ui_tracks, data
+    track_catalog['display'] = track_catalog['artist_name'] + " – " + track_catalog['track_name']
+
+    # UI-список — только display и item_id (для выбора)
+    ui_tracks = track_catalog[['display']].copy()
+
+    return allowed_item_ids, ui_tracks, track_catalog, edadata
 
 # --- Streamlit UI ---
 st.set_page_config(page_title="🎯 Рекомендации по трекам", page_icon="🎯")
 st.title("🎯 Получить рекомендации на основе любимых треков")
 
-allowed_item_ids, track_choices, data = load_resources()
+allowed_item_ids, track_choices, track_catalog, eda_data = load_resources()
 
 # Выбор треков
 selected_display = st.multiselect(
@@ -72,11 +71,23 @@ if st.button("Получить рекомендации"):
         known_items = set(knn_model.item_enc.categories_[0])
         unknown = [i for i in selected_items if i not in known_items]
         if unknown:
-            st.warning(f"Следующие треки не были в обучающих данных: {unknown}. Они будут пропущены.")
             selected_items = [i for i in selected_items if i in known_items]
         
         if not selected_items:
-            st.error("Ни один из выбранных треков не найден в модели.")
+            # Выводим 10 самых популярных треков из eda_data в диапазоне строк 140–150
+            subset = eda_data.iloc[140:151]  # 140 включительно, 151 — не включительно → 140–150
+            top_popular = subset.nlargest(10, 'popularity')
+            
+            # Получаем item_id этих треков
+            fallback_item_ids = top_popular['item_id'].tolist()
+            
+            # Фильтруем по наличию в track_catalog (на всякий случай)
+            fallback_item_ids = [item_id for item_id in fallback_item_ids if item_id in track_catalog.index]
+            
+            if fallback_item_ids:
+                recommendations = track_catalog.loc[fallback_item_ids].reset_index()
+                st.subheader("Рекомендуемые треки:")
+                st.dataframe(recommendations, use_container_width=True)
         else:
             # Преобразуем в индексы (через KNN, но должен совпадать с SLIM!)
             selected_indices = knn_model.item_enc.transform(np.array(selected_items).reshape(-1, 1)).flatten()
@@ -101,30 +112,19 @@ if st.button("Получить рекомендации"):
             # Фильтруем уже выбранные треки
             ensemble_scores[selected_indices] = -np.inf
 
-            # Топ-10
-            top_k = 10
-            top_indices = np.argpartition(ensemble_scores, -top_k)[-top_k:]
-            top_indices = top_indices[np.argsort(-ensemble_scores[top_indices])]
+            all_sorted_indices = np.argsort(-ensemble_scores)
+  
+            all_item_ids = knn_model.item_enc.inverse_transform(all_sorted_indices.reshape(-1, 1)).flatten()
 
-            # Декодируем в оригинальные item_id (через KNN — они должны совпадать)
-            top_item_ids = knn_model.item_enc.inverse_transform(top_indices.reshape(-1, 1)).flatten()
+            allowed_recommendations = [item_id for item_id in all_item_ids if item_id in allowed_item_ids]
 
-            # После получения top_item_ids (из модели)
-            # Фильтруем: оставляем ТОЛЬКО те, что есть в белом списке (edadata)
-            allowed_top_item_ids = [item_id for item_id in top_item_ids if item_id in allowed_item_ids]
+            # Берём ТОП-10 из разрешённых
+            top_10_allowed = allowed_recommendations[:10]
 
-            if not allowed_top_item_ids:
-                st.warning("Ни одна рекомендация не прошла фильтрацию.")
-            else:
-                # Теперь берём метаданные ИЗ DATA, но только для разрешённых item_id
-                recommendations = data[data['item_id'].isin(allowed_top_item_ids)].copy()
+            # Теперь берём метаданные ИЗ DATA, но только для этих 10
+            recommendations = track_catalog.loc[top_10_allowed].reset_index()
 
-                # Восстанавливаем порядок (top-k порядок из модели)
-                item_id_to_rank = {item_id: i for i, item_id in enumerate(top_item_ids)}
-                recommendations['rank'] = recommendations['item_id'].map(item_id_to_rank)
-                recommendations = recommendations.sort_values('rank').drop('rank', axis=1).reset_index(drop=True)
-
-                st.subheader("Ваши рекомендации:")
-                st.dataframe(recommendations, use_container_width=True)
+            st.subheader("Ваши рекомендации:")
+            st.dataframe(recommendations, use_container_width=True)
 
 st.sidebar.caption("© 2025 Music Recommender")
