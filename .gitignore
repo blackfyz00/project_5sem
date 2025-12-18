@@ -11,3 +11,4 @@ requirements.txt
 src/show_metrics.py
 myrep.md
 /streamlit/screenshots
+streamlit/__pycache__/
