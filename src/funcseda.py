@@ -112,7 +112,7 @@ class music_eda:
         self.data = df_encoded
         return self.data
     
-    def remove_genres(self, genres=['Anime', 'World', 'Comedy', 'Dance', 'Soundtrack', 'Reggaeton', 
+    def remove_genres(self, genres=['Anime', 'World', 'Comedy', 'Soundtrack', 'Reggaeton', 
                                     "Children's Music"]):
         # Удаляем строки, где genre_name находится в списке genres
         mask = ~self.data[f'genre'].isin(genres)
@@ -146,10 +146,4 @@ class music_eda:
         self.data = self.remove_genres()
         self.data = self.filter_by_popularity()
         self.data = self.encode_genre_column()
-        return self.data
-    
-    def do_encodingsoft(self):
-        """Выполняет все методы"""
-        self.data = self.get_unique_tracks()
-        self.data = self.remove_genres()
         return self.data

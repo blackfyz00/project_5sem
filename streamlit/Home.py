@@ -2,6 +2,11 @@ import streamlit as st
 from strings import string
 import base64
 import os
+import pathlib
+import re
+
+script_dir = pathlib.Path(__file__).parent.resolve()
+screenshots_dir = script_dir / "screenshots" 
 
 st.set_page_config(
     page_title="🎵 Music Recommender",
@@ -26,56 +31,27 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# # Подключаем Montserrat и применяем его ко всему приложению
-# st.markdown("""
-#     <style>
-#         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
-
-#         /* Применяем шрифт ко всем элементам */
-#         html, body, [class*="css"] {
-#             font-family: 'Montserrat', sans-serif !important;
-#         }
-
-#         /* Опционально: увеличить размер шрифта */
-#         p, div, span, li {
-#             font-size: 18px !important;
-#         }
-#     </style>
-# """, unsafe_allow_html=True)
-
-
 st.title("🎧 Рекомендательная система музыки: DYVMEK")
 st.markdown("""
-Добро пожаловать в персонализированную систему рекомендаций музыки...
+Добро пожаловать в персонализированную систему рекомендаций музыки.
 """)
 
-# file_path = "pdf.pdf"
-# def show_pdf(file_path):
-#     with open(file_path, "rb") as f:
-#         base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-#     pdf_display = f'<embed src="data:application/pdf;base64,{base64_pdf}" width="100%" height="800" type="application/pdf">'
-#     st.markdown(pdf_display, unsafe_allow_html=True)
+def sort_key_numeric(filename):
+    # Извлекаем числа из имени файла с помощью регулярного выражения
+    # Пример: для "10.png" вернет ['10', 'png']
+    parts = re.findall(r'(\d+)|(\D+)', filename)
+    # Преобразуем части в int, если это число, иначе оставляем строку
+    return [int(p[0]) if p[0] else p[1] for p in parts]
 
-# # Пример использования:
-# show_pdf("pdf.pdf")  # предполагается, что файл лежит в той же папке, что и скрипт
-
-st.markdown("---")
-# st.markdown(string)
-
-for filename in sorted(os.listdir("screenshots")):
+# Используем вашу функцию в качестве ключа для сортировки
+sorted_files = sorted(os.listdir(screenshots_dir), key=sort_key_numeric)
+col1, col2, col3 = st.columns([1, 2, 1])
+for filename in sorted_files:
     if filename.endswith(".png"):
-        st.image(f"screenshots/{filename}")
-        st.markdown("---")
+        with col2:
+            full_path = screenshots_dir / filename
+            st.image(full_path)
+            st.markdown("---")
 
-text = string
-st.markdown(
-    f"""
-    <div style="text-align: justify;">
-    {text}
-    """,
-    unsafe_allow_html=True
-)
-
-st.markdown("---")
 st.info("💡 Чтобы получить рекомендации, перейдите на страницу **«Рекомендации»** в боковом меню.")
 st.sidebar.caption("© 2025 Music Recommender")

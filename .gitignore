@@ -4,10 +4,6 @@
 /venv
 src/__pycache__
 item_features.csv
-interaction_data.csv
-edadata.csv
-newdata.csv
-requirements.txt
 src/show_metrics.py
 myrep.md
-/streamlit/screenshots
+streamlit/__pycache__/
