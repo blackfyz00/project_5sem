@@ -45,7 +45,7 @@ def sort_key_numeric(filename):
 
 # Используем вашу функцию в качестве ключа для сортировки
 sorted_files = sorted(os.listdir(screenshots_dir), key=sort_key_numeric)
-col1, col2, col3 = st.columns([1, 2, 1])
+col1, col2, col3 = st.columns([1, 10, 1])
 for filename in sorted_files:
     if filename.endswith(".png"):
         with col2:
